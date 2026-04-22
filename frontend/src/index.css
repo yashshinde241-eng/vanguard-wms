@@ -1,0 +1,94 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Base: ensure full-height chain from html → root ───────────────────── */
+html, body, #root {
+  height: 100%;
+  overflow: hidden;
+}
+
+/* ── Custom scrollbar ─────────────────────────────────────────────────── */
+::-webkit-scrollbar        { width: 4px; height: 4px; }
+::-webkit-scrollbar-track  { background: transparent; }
+::-webkit-scrollbar-thumb  { background: rgba(0,245,255,0.2); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(0,245,255,0.4); }
+
+/* ── Glassmorphism utilities ──────────────────────────────────────────── */
+@layer components {
+
+  /* Base glass card — no height, no overflow here; callers set those */
+  .glass-card {
+    @apply relative rounded-xl border border-white/[0.07]
+           bg-white/[0.04] backdrop-blur-xl
+           shadow-[inset_0_1px_0_rgba(255,255,255,0.06)];
+  }
+
+  .glass-card-glow {
+    @apply glass-card shadow-neon-cyan;
+  }
+
+  .neon-text-cyan {
+    color: #00f5ff;
+    text-shadow: 0 0 20px rgba(0,245,255,0.5);
+  }
+
+  .neon-text-purple {
+    color: #b347ff;
+    text-shadow: 0 0 20px rgba(179,71,255,0.5);
+  }
+
+  .btn-neon {
+    @apply relative px-4 py-2 rounded-lg font-body font-medium text-sm
+           border border-[#00f5ff]/30 text-[#00f5ff]
+           bg-[#00f5ff]/[0.06] backdrop-blur-sm
+           transition-all duration-200
+           hover:bg-[#00f5ff]/[0.12] hover:border-[#00f5ff]/60
+           hover:shadow-[0_0_20px_rgba(0,245,255,0.2)]
+           active:scale-95 whitespace-nowrap;
+  }
+
+  .btn-ghost {
+    @apply px-3 py-2 rounded-lg text-sm font-medium
+           text-white/50 hover:text-white/80
+           transition-colors duration-150 whitespace-nowrap;
+  }
+
+  .input-glass {
+    @apply w-full rounded-lg px-3 py-2
+           bg-white/[0.04] border border-white/10
+           text-white placeholder-white/25 text-sm font-body
+           outline-none focus:border-[#00f5ff]/50
+           focus:ring-1 focus:ring-[#00f5ff]/20
+           transition-all duration-200;
+  }
+
+  /* FIX: single canonical status-dot — no inline w/h overrides needed */
+  .status-dot {
+    @apply inline-block rounded-full flex-shrink-0;
+    width:  8px;
+    height: 8px;
+  }
+  .status-dot-sm {
+    @apply inline-block rounded-full flex-shrink-0;
+    width:  6px;
+    height: 6px;
+  }
+}
+
+/* ── Shimmer skeleton ─────────────────────────────────────────────────── */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(255,255,255,0.04) 25%,
+    rgba(255,255,255,0.08) 50%,
+    rgba(255,255,255,0.04) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s linear infinite;
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
