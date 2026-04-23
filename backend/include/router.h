@@ -31,11 +31,15 @@ private:
     crow::response handle_nav_grid_info();
     crow::response handle_nav_block(const crow::request& req);
 
-    // Phase 4 (new)
+    // Phase 4
     crow::response handle_post_order(const crow::request& req);
     crow::response handle_get_orders();
     crow::response handle_get_next_order();
     crow::response handle_post_optimize_pack(const crow::request& req);
+
+    // Phase 5 (new)
+    crow::response handle_efficiency_compress(const crow::request& req);
+    crow::response handle_nav_tsp(const crow::request& req);
 
     static crow::response json_response(int status, const nlohmann::json& body);
     static crow::response error_response(int status, const std::string& message);

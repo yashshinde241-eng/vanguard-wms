@@ -1,5 +1,5 @@
-// hooks/useApi.js — Phase 4
-// Adds: useOrders, submitOrder, processNextOrder, optimizePack
+// hooks/useApi.js — Phase 5
+// Adds: compressData, solveTSP
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 
@@ -14,7 +14,7 @@ export function useProducts() {
   const fetchProducts = useCallback(async () => {
     setLoading(true); setError(null)
     try {
-      const res  = await fetch(`${BASE}/products`)
+      const res = await fetch(`${BASE}/products`)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       setProducts((await res.json()).data ?? [])
     } catch (err) { setError(err.message) }
@@ -159,40 +159,27 @@ export async function toggleBlock(nodeId, action = 'block') {
 
 // ═══════════════════════ PHASE 4 ═══════════════════════════════════════════
 
-/**
- * useOrders — polls the order queue every 3 seconds.
- * Returns live-sorted orders (server sorts by urgency score).
- */
 export function useOrders() {
   const [orders,  setOrders]  = useState([])
   const [stats,   setStats]   = useState(null)
   const [loading, setLoading] = useState(true)
   const [error,   setError]   = useState(null)
-
   const fetchOrders = useCallback(async () => {
     try {
       const res  = await fetch(`${BASE}/orders`)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const json = await res.json()
-      setOrders(json.data  ?? [])
-      setStats(json.stats  ?? null)
-      setError(null)
+      setOrders(json.data ?? []); setStats(json.stats ?? null); setError(null)
     } catch (err) { setError(err.message) }
     finally { setLoading(false) }
   }, [])
-
   useEffect(() => {
-    fetchOrders()
-    const id = setInterval(fetchOrders, 3_000)
+    fetchOrders(); const id = setInterval(fetchOrders, 3_000)
     return () => clearInterval(id)
   }, [fetchOrders])
-
   return { orders, stats, loading, error, refetch: fetchOrders }
 }
 
-/**
- * submitOrder — POST a new order to the Max-Heap.
- */
 export async function submitOrder(payload) {
   const res  = await fetch(`${BASE}/orders`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -203,9 +190,6 @@ export async function submitOrder(payload) {
   return json.data
 }
 
-/**
- * processNextOrder — GET /api/orders/next (destructive pop).
- */
 export async function processNextOrder() {
   const res  = await fetch(`${BASE}/orders/next`)
   const json = await res.json()
@@ -213,13 +197,40 @@ export async function processNextOrder() {
   return { order: json.data, remaining: json.remaining }
 }
 
-/**
- * optimizePack — POST product IDs + capacity, returns Knapsack result.
- */
 export async function optimizePack(productIds, capacityKg) {
   const res  = await fetch(`${BASE}/optimize-pack`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ product_ids: productIds, capacity_kg: capacityKg }),
+  })
+  const json = await res.json()
+  if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`)
+  return json.data
+}
+
+// ═══════════════════════ PHASE 5 ═══════════════════════════════════════════
+
+/**
+ * compressData — POST a string to the Huffman encoder.
+ * Returns full encode result: bitstream_preview, codebook, stats.
+ */
+export async function compressData(data) {
+  const res  = await fetch(`${BASE}/efficiency/compress`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ data }),
+  })
+  const json = await res.json()
+  if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`)
+  return json.data
+}
+
+/**
+ * solveTSP — POST product IDs to get optimised picker tour.
+ * Returns tour_order, full_path, total_cost, algorithm used.
+ */
+export async function solveTSP(productIds, depot = 0) {
+  const res  = await fetch(`${BASE}/nav/tsp`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ product_ids: productIds, depot }),
   })
   const json = await res.json()
   if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`)

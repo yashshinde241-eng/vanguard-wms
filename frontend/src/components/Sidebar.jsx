@@ -1,21 +1,21 @@
 /**
- * Sidebar.jsx — Phase 4
- * Adds "Dispatch" nav item pointing to the new dispatch page.
+ * Sidebar.jsx — Phase 5
+ * Analytics nav item now active, routing to 'efficiency' page.
  */
 
 import { motion } from 'framer-motion'
 import {
   LayoutDashboard, Package, GitBranch,
-  Navigation, Truck, Settings, Cpu
+  Navigation, Truck, BarChart3, Cpu
 } from 'lucide-react'
 
 const NAV_ITEMS = [
-  { icon: LayoutDashboard, label: 'Dashboard',   page: 'dashboard', phase: 1 },
-  { icon: Package,         label: 'Products',    page: 'dashboard', phase: 1 },
-  { icon: GitBranch,       label: 'AVL Trees',   page: 'dashboard', phase: 2 },
-  { icon: Navigation,      label: 'Pathfinding', page: 'logistics', phase: 3 },
-  { icon: Truck,           label: 'Dispatch',    page: 'dispatch',  phase: 4 },
-  { icon: Settings,        label: 'Settings',    page: 'dashboard', phase: 1 },
+  { icon: LayoutDashboard, label: 'Dashboard',   page: 'dashboard',  phase: 1 },
+  { icon: Package,         label: 'Products',    page: 'dashboard',  phase: 1 },
+  { icon: GitBranch,       label: 'AVL Trees',   page: 'dashboard',  phase: 2 },
+  { icon: Navigation,      label: 'Pathfinding', page: 'logistics',  phase: 3 },
+  { icon: Truck,           label: 'Dispatch',    page: 'dispatch',   phase: 4 },
+  { icon: BarChart3,       label: 'Efficiency',  page: 'efficiency', phase: 5 },
 ]
 
 export default function Sidebar({ currentPage = 'dashboard', onNavigate }) {
@@ -52,9 +52,9 @@ export default function Sidebar({ currentPage = 'dashboard', onNavigate }) {
             >
               <Icon size={16} className={isActive ? 'text-[#00f5ff]' : ''} />
               <span className="font-body text-sm font-medium">{label}</span>
-              {phase === 4 && !isActive && (
-                <span className="ml-auto font-mono text-[9px] text-[#ffb800]/40
-                                 border border-[#ffb800]/15 rounded px-1.5 py-0.5">
+              {phase === 5 && !isActive && (
+                <span className="ml-auto font-mono text-[9px] text-[#00f5ff]/30
+                                 border border-[#00f5ff]/15 rounded px-1.5 py-0.5">
                   NEW
                 </span>
               )}
@@ -64,7 +64,7 @@ export default function Sidebar({ currentPage = 'dashboard', onNavigate }) {
       </nav>
 
       <div className="border-t border-white/[0.06] pt-4 mt-4">
-        <p className="font-mono text-[10px] text-white/20">v4.0.0 · Phase 4</p>
+        <p className="font-mono text-[10px] text-white/20">v5.0.0 · Phase 5</p>
         <p className="font-mono text-[10px] text-white/15">Lead: Yash Shinde</p>
       </div>
     </aside>

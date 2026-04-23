@@ -1,19 +1,20 @@
 /**
- * App.jsx — Phase 4
- * Adds dispatch page routing.
+ * App.jsx — Phase 5
+ * Adds 'efficiency' page routing.
  */
-import { useState }    from 'react'
-import { motion }      from 'framer-motion'
-import Sidebar         from './components/Sidebar'
-import StatusBar       from './components/StatusBar'
-import Dashboard       from './components/Dashboard'
-import LogisticsPage   from './components/LogisticsPage'
-import DispatchPage    from './components/DispatchPage'
-import { useProducts } from './hooks/useApi'
+import { useState }      from 'react'
+import { motion }        from 'framer-motion'
+import Sidebar           from './components/Sidebar'
+import StatusBar         from './components/StatusBar'
+import Dashboard         from './components/Dashboard'
+import LogisticsPage     from './components/LogisticsPage'
+import DispatchPage      from './components/DispatchPage'
+import EfficiencyPage    from './components/EfficiencyPage'
+import { useProducts }   from './hooks/useApi'
 
 export default function App() {
-  const { products }        = useProducts()
-  const [page, setPage]     = useState('dashboard')
+  const { products }     = useProducts()
+  const [page, setPage]  = useState('dashboard')
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-void text-white">
@@ -33,9 +34,10 @@ export default function App() {
           transition={{ duration: 0.22 }}
           className="flex-1 min-h-0 overflow-hidden flex flex-col"
         >
-          {page === 'dashboard' && <Dashboard />}
-          {page === 'logistics' && <LogisticsPage />}
-          {page === 'dispatch'  && <DispatchPage />}
+          {page === 'dashboard'  && <Dashboard />}
+          {page === 'logistics'  && <LogisticsPage />}
+          {page === 'dispatch'   && <DispatchPage />}
+          {page === 'efficiency' && <EfficiencyPage />}
         </motion.main>
       </div>
     </div>

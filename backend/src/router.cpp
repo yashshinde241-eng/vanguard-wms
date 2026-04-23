@@ -11,7 +11,7 @@ Router::Router(std::shared_ptr<InventoryEngine> engine)
 
 void Router::register_routes(crow::SimpleApp& app) {
 
-    // CORS pre-flight
+    // CORS
     CROW_ROUTE(app, "/api/<path>").methods(crow::HTTPMethod::OPTIONS)
     ([](const crow::request&, crow::response& res, const std::string&) {
         res.add_header("Access-Control-Allow-Origin",  "*");
@@ -59,27 +59,34 @@ void Router::register_routes(crow::SimpleApp& app) {
     ([this](const crow::request& req) { return handle_nav_block(req); });
 
     // ──────────── PHASE 4 ────────────
-    // POST /api/orders        — push a new order onto the Max-Heap
     CROW_ROUTE(app, "/api/orders").methods(crow::HTTPMethod::POST)
     ([this](const crow::request& req) { return handle_post_order(req); });
 
-    // GET  /api/orders        — all active orders sorted by urgency
     CROW_ROUTE(app, "/api/orders").methods(crow::HTTPMethod::GET)
     ([this](const crow::request&) { return handle_get_orders(); });
 
-    // GET  /api/orders/next   — pop highest-priority order (destructive)
     CROW_ROUTE(app, "/api/orders/next").methods(crow::HTTPMethod::GET)
     ([this](const crow::request&) { return handle_get_next_order(); });
 
-    // POST /api/optimize-pack — 0/1 Knapsack on selected product IDs
     CROW_ROUTE(app, "/api/optimize-pack").methods(crow::HTTPMethod::POST)
     ([this](const crow::request& req) { return handle_post_optimize_pack(req); });
 
-    std::cout << "[Router] Phase 4 routes:\n"
-              << "  POST /api/orders\n"
-              << "  GET  /api/orders\n"
-              << "  GET  /api/orders/next\n"
-              << "  POST /api/optimize-pack\n";
+    // ──────────── PHASE 5 ────────────
+    // POST /api/efficiency/compress
+    //   Body: { "data": "<any string or JSON>" }
+    //   Returns: Huffman bitstream, codebook, compression stats
+    CROW_ROUTE(app, "/api/efficiency/compress").methods(crow::HTTPMethod::POST)
+    ([this](const crow::request& req) { return handle_efficiency_compress(req); });
+
+    // POST /api/nav/tsp
+    //   Body: { "product_ids": [1,2,3,...], "depot": 0 }
+    //   Returns: optimal tour order + full stitched grid path
+    CROW_ROUTE(app, "/api/nav/tsp").methods(crow::HTTPMethod::POST)
+    ([this](const crow::request& req) { return handle_nav_tsp(req); });
+
+    std::cout << "[Router] Phase 5 routes:\n"
+              << "  POST /api/efficiency/compress\n"
+              << "  POST /api/nav/tsp\n";
 }
 
 // ─────────────────── PHASE 1 ───────────────────────────────────────────────
@@ -91,7 +98,7 @@ crow::response Router::handle_health() {
     ts << std::put_time(std::gmtime(&time), "%Y-%m-%dT%H:%M:%SZ");
     return json_response(200, {
         {"status","ok"},{"service","Vanguard-WMS"},
-        {"version","4.0.0-phase4"},{"timestamp",ts.str()}
+        {"version","5.0.0-phase5"},{"timestamp",ts.str()}
     });
 }
 
@@ -216,73 +223,77 @@ crow::response Router::handle_post_order(const crow::request& req) {
         for (auto& f : {"order_ref","customer_name","sku"})
             if (!b.contains(f) || b[f].get<std::string>().empty())
                 return error_response(400, std::string("Missing: ") + f);
-
-        std::string type_str = b.value("shipping_type", std::string("STANDARD"));
-        ShippingType stype   = shipping_type_from_str(type_str);
-
+        ShippingType stype = shipping_type_from_str(b.value("shipping_type",std::string("STANDARD")));
         Order o = engine_->push_order(
             b["order_ref"].get<std::string>(),
             b["customer_name"].get<std::string>(),
             b["sku"].get<std::string>(),
-            b.value("quantity", 1),
-            b.value("value",    0.0),
-            stype
-        );
-        return json_response(201, {
-            {"success", true},
-            {"message", "Order pushed to heap"},
-            {"data",    order_to_json(o)},
-            {"heap_size", engine_->stats().heap_size}
-        });
+            b.value("quantity",1), b.value("value",0.0), stype);
+        return json_response(201,{{"success",true},{"message","Order pushed"},
+                                   {"data",order_to_json(o)},
+                                   {"heap_size",engine_->stats().heap_size}});
     } catch (const nlohmann::json::parse_error&) {
-        return error_response(400, "Invalid JSON body");
-    } catch (const std::exception& e) {
-        return error_response(500, e.what());
-    }
+        return error_response(400,"Invalid JSON");
+    } catch (const std::exception& e) { return error_response(500,e.what()); }
 }
 
 crow::response Router::handle_get_orders() {
-    return json_response(200, {
-        {"success", true},
-        {"data",    engine_->orders_json()},
-        {"stats",   engine_->orders_stats_json()}
-    });
+    return json_response(200,{{"success",true},
+        {"data",engine_->orders_json()},
+        {"stats",engine_->orders_stats_json()}});
 }
 
 crow::response Router::handle_get_next_order() {
     if (engine_->orders_empty())
-        return error_response(404, "No active orders in queue");
+        return error_response(404,"No active orders in queue");
     try {
         Order o = engine_->pop_order();
-        return json_response(200, {
-            {"success",   true},
-            {"message",   "Order extracted from heap"},
-            {"data",      order_to_json(o)},
-            {"remaining", engine_->stats().heap_size}
-        });
-    } catch (const std::exception& e) {
-        return error_response(500, e.what());
-    }
+        return json_response(200,{{"success",true},{"message","Order dispatched"},
+                                   {"data",order_to_json(o)},
+                                   {"remaining",engine_->stats().heap_size}});
+    } catch (const std::exception& e) { return error_response(500,e.what()); }
 }
 
 crow::response Router::handle_post_optimize_pack(const crow::request& req) {
     try {
         auto b = nlohmann::json::parse(req.body);
-        if (!b.contains("product_ids") || !b["product_ids"].is_array())
-            return error_response(400, "Missing: product_ids (array)");
+        if (!b.contains("product_ids")||!b["product_ids"].is_array())
+            return error_response(400,"Missing: product_ids (array)");
         if (!b.contains("capacity_kg"))
-            return error_response(400, "Missing: capacity_kg");
-
+            return error_response(400,"Missing: capacity_kg");
         std::vector<int> ids;
         for (const auto& id : b["product_ids"]) ids.push_back(id.get<int>());
         double cap = b["capacity_kg"].get<double>();
-
         auto t0  = std::chrono::steady_clock::now();
         auto res = engine_->optimise_packing(ids, cap);
         auto us  = std::chrono::duration_cast<std::chrono::microseconds>(
-                       std::chrono::steady_clock::now() - t0).count();
+                       std::chrono::steady_clock::now()-t0).count();
+        auto rj  = Optimizer::result_to_json(res);
+        rj["elapsed_us"] = (int)us;
+        return json_response(200,{{"success",true},{"data",rj}});
+    } catch (const nlohmann::json::parse_error&) { return error_response(400,"Invalid JSON"); }
+    catch (const std::invalid_argument& e)       { return error_response(400,e.what()); }
+    catch (const std::exception& e)              { return error_response(500,e.what()); }
+}
 
-        auto rj = Optimizer::result_to_json(res);
+// ─────────────────── PHASE 5 ───────────────────────────────────────────────
+
+crow::response Router::handle_efficiency_compress(const crow::request& req) {
+    try {
+        auto b = nlohmann::json::parse(req.body);
+        if (!b.contains("data"))
+            return error_response(400, "Missing field: data");
+
+        std::string input = b["data"].get<std::string>();
+        if (input.empty())
+            return error_response(400, "Field 'data' must not be empty");
+
+        auto t0     = std::chrono::steady_clock::now();
+        auto result = engine_->compress(input);
+        auto us     = std::chrono::duration_cast<std::chrono::microseconds>(
+                          std::chrono::steady_clock::now() - t0).count();
+
+        auto rj = HuffmanCoder::encode_result_to_json(result);
         rj["elapsed_us"] = (int)us;
 
         return json_response(200, {{"success", true}, {"data", rj}});
@@ -291,6 +302,41 @@ crow::response Router::handle_post_optimize_pack(const crow::request& req) {
         return error_response(400, "Invalid JSON body");
     } catch (const std::invalid_argument& e) {
         return error_response(400, e.what());
+    } catch (const std::exception& e) {
+        return error_response(500, e.what());
+    }
+}
+
+crow::response Router::handle_nav_tsp(const crow::request& req) {
+    try {
+        auto b = nlohmann::json::parse(req.body);
+        if (!b.contains("product_ids") || !b["product_ids"].is_array())
+            return error_response(400, "Missing: product_ids (array)");
+        if (b["product_ids"].empty())
+            return error_response(400, "product_ids must not be empty");
+
+        std::vector<int> pids;
+        for (const auto& id : b["product_ids"])
+            pids.push_back(id.get<int>());
+
+        int depot = b.value("depot", 0);
+
+        auto t0  = std::chrono::steady_clock::now();
+        auto res = engine_->solve_tsp(pids, depot);
+        auto us  = std::chrono::duration_cast<std::chrono::microseconds>(
+                       std::chrono::steady_clock::now() - t0).count();
+
+        auto rj = TSPSolver::result_to_json(res);
+        rj["elapsed_us"] = (int)us;
+
+        return json_response(200, {{"success", true}, {"data", rj}});
+
+    } catch (const nlohmann::json::parse_error&) {
+        return error_response(400, "Invalid JSON body");
+    } catch (const std::invalid_argument& e) {
+        return error_response(400, e.what());
+    } catch (const std::runtime_error& e) {
+        return error_response(422, e.what());
     } catch (const std::exception& e) {
         return error_response(500, e.what());
     }
